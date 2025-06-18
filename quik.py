@@ -28,6 +28,7 @@ userChoose = input(
     GREEN + "If you want to add another -> +" + RESET + "\n" +
     RED + "If you want to delete one -> -" + RESET + "\n"
 )
+print()
 
 def path_completer(text, state):
     text_expanded = os.path.expanduser(text)
@@ -69,6 +70,7 @@ if userChoose == "+":
         name = input(CYAN + "Choose the shortcut name:\n" + RESET)
         if " " in name:
             print(RED + "The name cannot contain spaces" + RESET + "\n")
+    print()
     
     readline.set_completer_delims(' \t\n;')
     readline.parse_and_bind("tab: complete")
@@ -91,13 +93,13 @@ if userChoose == "+":
     subprocess.run(f"sudo mv /usr/local/bin/prepare /usr/local/bin/{name}", shell=True)
     subprocess.run(f"chmod +x /usr/local/bin/{name}", shell=True)
 
-    print(GREEN + "Created!" + RESET)
+    print("\n" + GREEN + "Created!" + RESET)
     print(YELLOW + "You can do more things by running this again." + RESET)
 
 elif userChoose == "-":
     name = input(RED + "Which shortcut do you want to remove?\n" + RESET)
     subprocess.run(f"sudo rm /usr/local/bin/{name}", shell=True)
-    print(GREEN + "Completed!" + RESET)
+    print("\n" + GREEN + "Completed!" + RESET)
 
 else:
     print(BLUE + "Exit." + RESET)
