@@ -64,8 +64,12 @@ def path_completer(text, state):
         return None
 
 if userChoose == "+":
-    name = input(CYAN + "Choose the shortcut name:\n" + RESET)
-
+    name = " "
+    while " " in name:
+        name = input(CYAN + "Choose the shortcut name:\n" + RESET)
+        if " " in name:
+            print(RED + "The name cannot contain spaces" + RESET + "\n")
+    
     readline.set_completer_delims(' \t\n;')
     readline.parse_and_bind("tab: complete")
     readline.set_completer(path_completer)
