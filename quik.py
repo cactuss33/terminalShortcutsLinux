@@ -84,7 +84,8 @@ if userChoose == "+":
 
     pathWithoutFile = os.path.dirname(path)
     file = os.path.basename(path)
-    shortcutPrep = f"cd {pathWithoutFile} && ./{file}"
+    print(RED + "\nTo try to increase performance, the process will be prioritized so that the CPU focuses on it\nif there are any problems, sorry" + RED)
+    shortcutPrep = f"cd {pathWithoutFile} && nice ./{file}"
 
     with open("prepare", "w") as prep:
         prep.write(shortcutPrep)
