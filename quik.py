@@ -95,12 +95,37 @@ if userChoose == "+":
     subprocess.run(f"chmod +x /usr/local/bin/{name}", shell=True)
 
     print("\n" + GREEN + "Created!" + RESET)
+
+
+    if(input(CYAN + "Do you want to add an icon? y/n\n" + RESET) == "y"):
+        print("\nok, this isn't supported yet\n")
+
+        with open("appTemplate.desktop", "r") as Template:
+            content = Template.read()
+            
+        content = content.replace("%exec%", name)
+
+        iconPath = input(CYAN + "Enter the icon file path:\n" + RESET)
+
+        content = content.replace("%icon%", iconPath)
+        
+        with open("appPrepare.desktop", "w") as appPrepare:
+            appPrepare.write(content)    
+
+        subprocess.run(f"cp appPrepare.desktop /usr/share/applications/{name}.desktop", shell=True)
+
+        print(GREEN + "\ncreted icon\n" + RESET)
+
     print(YELLOW + "You can do more things by running this again." + RESET)
+
+    
 
 elif userChoose == "-":
     name = input(RED + "Which shortcut do you want to remove?\n" + RESET)
     subprocess.run(f"sudo rm /usr/local/bin/{name}", shell=True)
     print("\n" + GREEN + "Completed!" + RESET)
+    if os.path.isfile(f"/usr/share/applications/{name}.desktop"):
+        subprocess.run(f"sudo rm /usr/share/applications/{name}.desktop",shell=True)
 
 else:
     print(BLUE + "Exit." + RESET)

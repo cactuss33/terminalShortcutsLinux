@@ -1,0 +1,7 @@
+[Desktop Entry]
+Name=%exec%
+Comment=MadewithterminalShortcutsLinux
+Exec=%exec%
+Icon=%icon%
+Terminal=false
+Type=Application
