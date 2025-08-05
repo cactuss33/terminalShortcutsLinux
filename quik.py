@@ -2,6 +2,9 @@ import os
 import subprocess
 import sys
 import readline
+import time
+
+subprocess.run("clear")
 
 # Colores ANSI
 RED = "\033[91m"
@@ -87,45 +90,44 @@ if userChoose == "+":
     print(RED + "\nTo try to increase performance, the process will be prioritized so that the CPU focuses on it\nif there are any problems, sorry" + RED)
     shortcutPrep = f"cd {pathWithoutFile} && nice ./{file}"
 
-    with open("prepare", "w") as prep:
+    with open("build/commandBuild", "w") as prep:
         prep.write(shortcutPrep)
     
-    subprocess.run("sudo cp prepare /usr/local/bin/", shell=True)
-    subprocess.run(f"sudo mv /usr/local/bin/prepare /usr/local/bin/{name}", shell=True)
+    subprocess.run("sudo cp build/commandBuild /usr/local/bin/", shell=True)
+    subprocess.run(f"sudo mv /usr/local/bin/commandBuild /usr/local/bin/{name}", shell=True)
     subprocess.run(f"chmod +x /usr/local/bin/{name}", shell=True)
 
     print("\n" + GREEN + "Created!" + RESET)
 
 
     if(input(CYAN + "Do you want to add an icon? y/n\n" + RESET) == "y"):
-        print("\nok, this isn't supported yet\n")
 
-        with open("appTemplate.desktop", "r") as Template:
+        with open("build/appBuild.desktop", "r") as Template:
             content = Template.read()
             
         content = content.replace("%exec%", name)
 
-        iconPath = input(CYAN + "Enter the icon file path:\n" + RESET)
+        iconPath = input(CYAN + "\nEnter the icon file path:\n" + RESET)
 
         content = content.replace("%icon%", iconPath)
         
-        with open("appPrepare.desktop", "w") as appPrepare:
-            appPrepare.write(content)    
+        with open("build/appBuild.desktop", "w") as appBuild:
+            appBuild.write(content)    
 
-        subprocess.run(f"cp appPrepare.desktop /usr/share/applications/{name}.desktop", shell=True)
+        subprocess.run(f"cp build/appBuild.desktop /usr/share/applications/{name}.desktop", shell=True)
 
         print(GREEN + "\ncreted icon\n" + RESET)
 
     print(YELLOW + "You can do more things by running this again." + RESET)
-
-    
+    time.sleep(2.5)    
 
 elif userChoose == "-":
     name = input(RED + "Which shortcut do you want to remove?\n" + RESET)
     subprocess.run(f"sudo rm /usr/local/bin/{name}", shell=True)
-    print("\n" + GREEN + "Completed!" + RESET)
     if os.path.isfile(f"/usr/share/applications/{name}.desktop"):
         subprocess.run(f"sudo rm /usr/share/applications/{name}.desktop",shell=True)
-
+    print("\n" + GREEN + "Completed!" + RESET)
+    time.sleep(1.5)
 else:
     print(BLUE + "Exit." + RESET)
+    time.sleep(1.5)
