@@ -5,4 +5,4 @@ Gracias por leer, cualquier problema con esto, avisa
 
 para descargar:
 
-git clone https://github.com/cactuss33/terminalShortcutsLinux/new/main && cd terminalShortcutsLinux && ./start.sh
+git clone https://github.com/cactuss33/terminalShortcutsLinux/ && cd terminalShortcutsLinux && ./start.sh
