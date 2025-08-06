@@ -168,7 +168,7 @@ print()
 if userChoose == "+":
     name = " "
     while " " in name or name == "":
-        print(CYAN + "Choose the shortcut name (no spaces):" + RESET)
+        print(CYAN + "Choose the shortcut name" + RESET)
         name = input().strip()
         if " " in name or name == "":
             print(RED + "The name cannot contain spaces or be empty.\n" + RESET)
@@ -196,13 +196,9 @@ if userChoose == "+":
 
     add_icon = input("Do you want to add an icon? y/n\n").strip().lower()
     if add_icon == "y":
-        try:
-            with open("build/appBuild.desktop", "r") as template:
+        with open("appTemplate.desktop", "r") as template:
                 content = template.read()
-        except FileNotFoundError:
-            print(RED + "Missing file: build/appBuild.desktop" + RESET)
-            sys.exit(1)
-
+                
         content = content.replace("%exec%", name)
 
         iconPath = select_path_interactive("Enter the icon file path")

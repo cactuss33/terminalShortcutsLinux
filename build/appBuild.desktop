@@ -1,1 +1,7 @@
-Hi!
+[Desktop Entry]
+Name=celeste
+Comment=MadewithterminalShortcutsLinux
+Exec=celeste
+Icon=/home/martiparra/celeste.png
+Terminal=false
+Type=Application
