@@ -6,7 +6,7 @@ Para descargar:
 
 git clone https://github.com/cactuss33/terminalShortcutsLinux/ && cd terminalShortcutsLinux && ./start.sh
 
-Si no tienes ciertas librerías instaladas, se instalarán automáticamente.
+Si no tienes ciertas librerías necesarias, se instalarán automáticamente.
 
 Importante: es posible que debas volver a ejecutar el script (start.sh) después de la instalación para que los cambios surjan efecto.
 
