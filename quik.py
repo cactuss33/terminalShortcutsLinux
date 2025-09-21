@@ -182,7 +182,7 @@ if userChoose == "+":
 
     print(RED + "\nTrying to prioritize process for better performance...\n" + RESET)
 
-    shortcutPrep = f"cd {pathWithoutFile} && nice ./{file}"
+    shortcutPrep = f"cd {pathWithoutFile} && nice ./{file} &@"
 
     os.makedirs("build", exist_ok=True)
     with open("build/commandBuild", "w") as prep:
