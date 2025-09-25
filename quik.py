@@ -34,9 +34,9 @@ def git_as_user(cmd):
     subprocess.run(["sudo", "-u", user, "git"] + cmd, check=True)
 
 def do_update():
-    print("Updating...")
+    print(YELLOW + "Updating..." + RESET)
     git_as_user(["pull"])
-    print("✅ Update completed.")
+    print(GREEN + "Update completed." + RESET)
     time.sleep(2)
 
 def update_available():
@@ -50,7 +50,7 @@ def update_available():
     return local != remoto
         
 if update_available():
-    if input("An update is available right now, you want to install it? y/n") == "y":
+    if input(GREEN + "\nAn update is available right now, you want to install it? y/n " + RESET) == "y":
         do_update()
     else:
         print("ok")
