@@ -25,6 +25,12 @@ except:
     time.sleep(4)
     sys.exit()
 
+def do_update():
+    print("Updating...")
+    subprocess.run(["git", "pull"], check=True)
+    print("✅ Update completed.")
+    time.sleep(2)
+
 def update_available():
     #this is made by chatGPT
     
@@ -39,9 +45,11 @@ def update_available():
         
 if update_available():
     if input("An update is available right now, you want to install it? y/n") == "y":
-        print("updating...")
+        do_update()
     else:
         print("ok")
+
+
     
 class FileBrowser:
     def __init__(self, start_path=None):
