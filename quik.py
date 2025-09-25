@@ -26,23 +26,18 @@ except:
     sys.exit()
 
 def update_available():
-
     #this is made by chatGPT
     
-    # Traer referencias remotas
+    # Busca actualizaciones en el remoto
     subprocess.run(["git", "fetch"], check=True)
 
-    # Lista de commits que están en remoto y no en local
-    result = subprocess.run(
-        ["git", "rev-list", "--count", "HEAD..@{u}"],
-        text=True,
-        capture_output=True,
-        check=True
-    )
-    cambios = int(result.stdout.strip())
-    return cambios > 0
-    
-if update_available:
+    # Compara HEAD local con el remoto
+    local = subprocess.check_output(["git", "rev-parse", "HEAD"]).strip()
+    remoto = subprocess.check_output(["git", "rev-parse", "@{u}"]).strip()
+
+    return local != remoto
+        
+if update_available():
     if input("An update is available right now, you want to install it? y/n") == "y":
         print("updating...")
     else:
