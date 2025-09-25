@@ -12,3 +12,4 @@ Importante: es posible que debas volver a ejecutar el script (start.sh) después
 
 Gracias por leer.
 Cualquier problema, no dudes en avisar.
+
