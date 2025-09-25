@@ -25,21 +25,27 @@ except:
     time.sleep(4)
     sys.exit()
 
+def git_as_user(cmd):
+    """
+    Ejecuta Git como el usuario original, evitando problemas de permisos
+    en .git cuando el script corre con sudo.
+    """
+    user = os.environ.get("SUDO_USER", os.environ.get("USER"))
+    subprocess.run(["sudo", "-u", user, "git"] + cmd, check=True)
+
 def do_update():
     print("Updating...")
-    subprocess.run(["git", "pull"], check=True)
+    git_as_user(["pull"])
     print("✅ Update completed.")
     time.sleep(2)
 
 def update_available():
-    #this is made by chatGPT
-    
     # Busca actualizaciones en el remoto
-    subprocess.run(["git", "fetch"], check=True)
+    git_as_user(["fetch"])
 
     # Compara HEAD local con el remoto
-    local = subprocess.check_output(["git", "rev-parse", "HEAD"]).strip()
-    remoto = subprocess.check_output(["git", "rev-parse", "@{u}"]).strip()
+    local = subprocess.check_output(["sudo", "-u", os.environ.get("SUDO_USER", os.environ.get("USER")), "git", "rev-parse", "HEAD"]).strip()
+    remoto = subprocess.check_output(["sudo", "-u", os.environ.get("SUDO_USER", os.environ.get("USER")), "git", "rev-parse", "@{u}"]).strip()
 
     return local != remoto
         
