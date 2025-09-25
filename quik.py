@@ -24,6 +24,21 @@ except:
     print(GREEN + "prompt-toolkit has been installed! Run the program again to apply the changes." + RESET)
     time.sleep(4)
     sys.exit()
+
+def update_available():
+    # Search for updates
+    subprocess.run(["git", "fetch"], check=True)
+    
+    local = subprocess.check_output(["git", "rev-parse", "HEAD"]).strip()
+    remoto = subprocess.check_output(["git", "rev-parse", "@{u}"]).strip()
+
+    return local != remoto
+
+if update_available:
+    if input("An update is available right now, you want to install it? y/n") == "y":
+        print("updating...")
+    else:
+        print("ok")
     
 class FileBrowser:
     def __init__(self, start_path=None):
