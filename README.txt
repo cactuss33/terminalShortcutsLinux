@@ -4,6 +4,7 @@ El sistema de autocompletado ha sido desarrollado por ChatGPT; el resto del cód
 
 Para descargar:
 
+
 git clone https://github.com/cactuss33/terminalShortcutsLinux/ && cd terminalShortcutsLinux && ./start.sh
 
 Si no tienes ciertas librerías necesarias, se instalarán automáticamente.
