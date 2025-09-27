@@ -2,6 +2,8 @@ import os
 import sys
 import subprocess
 import time
+import socket
+import getpass
 
 RED = "\033[91m"
 GREEN = "\033[92m"
@@ -25,30 +27,81 @@ except:
     time.sleep(4)
     sys.exit()
 
-def git_as_user(cmd):
+
+def git_as_user(cmd, timeout=None, capture_output=False, env=None):
     """
-    Ejecuta Git como el usuario original, evitando problemas de permisos
-    en .git cuando el script corre con sudo.
+    Ejecuta 'git <cmd>' como el usuario original (SUDO_USER o USER).
     """
     user = os.environ.get("SUDO_USER", os.environ.get("USER"))
-    subprocess.run(["sudo", "-u", user, "git"] + cmd, check=True)
+    base = ["sudo", "-u", user, "git"] + cmd
+    if capture_output:
+        out = subprocess.check_output(base, stderr=subprocess.STDOUT, timeout=timeout, env=env)
+        return out.decode().strip()
+    else:
+        subprocess.run(base, check=True, timeout=timeout,
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=env)
+        return None
 
-def do_update():
-    print(YELLOW + "Updating..." + RESET)
-    git_as_user(["pull"])
-    print(GREEN + "Update completed." + RESET)
-    time.sleep(2)
+
+def has_internet(host="github.com", port=443, timeout=3):
+    """Comprueba conectividad TCP para evitar que git se cuelgue sin internet"""
+    try:
+        s = socket.create_connection((host, port), timeout)
+        s.close()
+        return True
+    except Exception:
+        return False
+
 
 def update_available():
-    # Busca actualizaciones en el remoto
-    git_as_user(["fetch"])
+    if not has_internet():
+        print(RED + "[!] No internet connection — skipping update check." + RESET)
+        return False
 
-    # Compara HEAD local con el remoto
-    local = subprocess.check_output(["sudo", "-u", os.environ.get("SUDO_USER", os.environ.get("USER")), "git", "rev-parse", "HEAD"]).strip()
-    remoto = subprocess.check_output(["sudo", "-u", os.environ.get("SUDO_USER", os.environ.get("USER")), "git", "rev-parse", "@{u}"]).strip()
+    env = os.environ.copy()
+    env["GIT_TERMINAL_PROMPT"] = "0"
+
+    try:
+        git_as_user(["fetch", "--quiet"], timeout=15, env=env)
+    except subprocess.TimeoutExpired:
+        print(RED + "[!] git fetch timed out." + RESET)
+        return False
+    except subprocess.CalledProcessError as e:
+        print(RED + f"[!] git fetch failed: {e}" + RESET)
+        return False
+
+    try:
+        local = git_as_user(["rev-parse", "HEAD"], capture_output=True, timeout=10, env=env)
+    except Exception:
+        print(RED + "[!] Could not read local HEAD." + RESET)
+        return False
+
+    try:
+        remoto = git_as_user(["rev-parse", "@{u}"], capture_output=True, timeout=10, env=env)
+    except subprocess.CalledProcessError:
+        print(RED + "[!] Remote branch not found (no upstream configured?)" + RESET)
+        return False
+    except subprocess.TimeoutExpired:
+        print(RED + "[!] git rev-parse @{u} timed out." + RESET)
+        return False
 
     return local != remoto
-        
+
+
+def do_update():
+    env = os.environ.copy()
+    env["GIT_TERMINAL_PROMPT"] = "0"
+    print(YELLOW + "Updating..." + RESET)
+    try:
+        git_as_user(["pull", "--ff-only"], timeout=60, env=env)
+        print(GREEN + "Update completed." + RESET)
+    except subprocess.TimeoutExpired:
+        print(RED + "[!] git pull timed out." + RESET)
+    except subprocess.CalledProcessError as e:
+        print(RED + f"[!] git pull failed. Run 'git pull' manually to see the error: {e}" + RESET)
+    time.sleep(2)
+
+
 if update_available():
     if input(GREEN + "\nAn update is available right now, you want to install it? y/n " + RESET) == "y":
         do_update()
@@ -56,7 +109,6 @@ if update_available():
         print("ok")
 
 
-    
 class FileBrowser:
     def __init__(self, start_path=None):
         self.current_path = os.path.expanduser(start_path or "~")
@@ -91,11 +143,9 @@ class FileBrowser:
             entries = os.listdir(self.current_path)
         except Exception:
             entries = []
-        # Filtrar ocultos (archivos que empiezan con .)
         entries = [e for e in entries if not e.startswith(".")]
         if os.path.dirname(self.current_path) != self.current_path:
             entries.insert(0, "..")
-        # Directorios primero, luego archivos, orden alfabético
         self.entries = sorted(entries, key=lambda x: (not os.path.isdir(os.path.join(self.current_path, x)), x.lower()))
         if self.selected_index >= len(self.entries):
             self.selected_index = max(0, len(self.entries) - 1)
@@ -162,15 +212,15 @@ class FileBrowser:
             event.app.exit(result=None)
 
     def run(self):
-        subprocess.run("clear")  # limpia pantalla antes de iniciar
+        subprocess.run("clear")
         result = self.app.run()
-        subprocess.run("clear")  # limpia pantalla al salir
+        subprocess.run("clear")
         return result
 
 
 def select_path_interactive(prompt_text="Select file or directory"):
     print(CYAN + f"{prompt_text} (Use arrows ↑↓, Enter to select/enter, Backspace to go back, ESC to cancel)" + RESET)
-    home_user = os.path.join("/home", os.getlogin())
+    home_user = os.path.join("/home", os.environ.get("SUDO_USER") or getpass.getuser())
     browser = FileBrowser(start_path=home_user)
     path = browser.run()
     if path is None:
@@ -229,8 +279,8 @@ if userChoose == "+":
     add_icon = input("Do you want to add an icon? y/n\n").strip().lower()
     if add_icon == "y":
         with open("appTemplate.desktop", "r") as template:
-                content = template.read()
-                
+            content = template.read()
+
         content = content.replace("%exec%", name)
 
         iconPath = select_path_interactive("Enter the icon file path")
