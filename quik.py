@@ -77,7 +77,7 @@ def create_shortcut(exec_path, name, icon_path=None):
     with open("build/commandBuild", "w") as prep:
         prep.write(shortcut_prep)
     subprocess.run(f"sudo cp build/commandBuild {SHORTCUT_DIR}{name}", shell=True)
-    subprocess.run(f"chmod +x {SHORTCUT_DIR}{name}", shell=True)
+    subprocess.run(f"sudo chmod +x {SHORTCUT_DIR}{name}", shell=True)
 
     if icon_path and os.path.isfile("appTemplate.desktop"):
         with open("appTemplate.desktop", "r") as template:
