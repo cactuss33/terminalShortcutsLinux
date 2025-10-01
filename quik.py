@@ -2,8 +2,11 @@ import os
 import sys
 import subprocess
 import time
-import socket
 import getpass
+import socket
+
+# ---------------- Modo de ejecución ----------------
+USE_GUI = "-noGui" not in sys.argv
 
 RED = "\033[91m"
 GREEN = "\033[92m"
@@ -13,25 +16,11 @@ CYAN = "\033[96m"
 BOLD = "\033[1m"
 RESET = "\033[0m"
 
-try:
-    from prompt_toolkit import Application
-    from prompt_toolkit.key_binding import KeyBindings
-    from prompt_toolkit.layout import Layout
-    from prompt_toolkit.layout.controls import FormattedTextControl
-    from prompt_toolkit.layout.containers import HSplit, Window
-    from prompt_toolkit.styles import Style
-except:
-    print(RED + "You are missing some libraries to install, they will be installed below:" + RESET)
-    subprocess.run("sudo apt install python3-prompt-toolkit -y", shell=True)
-    print(GREEN + "prompt-toolkit has been installed! Run the program again to apply the changes." + RESET)
-    time.sleep(4)
-    sys.exit()
+SHORTCUT_DIR = "/usr/local/bin/"
+DESKTOP_DIR = "/usr/share/applications/"
 
-
+# ---------------- Funciones compartidas ----------------
 def git_as_user(cmd, timeout=None, capture_output=False, env=None):
-    """
-    Ejecuta 'git <cmd>' como el usuario original (SUDO_USER o USER).
-    """
     user = os.environ.get("SUDO_USER", os.environ.get("USER"))
     base = ["sudo", "-u", user, "git"] + cmd
     if capture_output:
@@ -42,9 +31,7 @@ def git_as_user(cmd, timeout=None, capture_output=False, env=None):
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=env)
         return None
 
-
 def has_internet(host="github.com", port=443, timeout=3):
-    """Comprueba conectividad TCP para evitar que git se cuelgue sin internet"""
     try:
         s = socket.create_connection((host, port), timeout)
         s.close()
@@ -52,262 +39,273 @@ def has_internet(host="github.com", port=443, timeout=3):
     except Exception:
         return False
 
-
 def update_available():
     if not has_internet():
-        print(RED + "[!] No internet connection — skipping update check." + RESET)
         return False
-
     env = os.environ.copy()
     env["GIT_TERMINAL_PROMPT"] = "0"
-
     try:
         git_as_user(["fetch", "--quiet"], timeout=15, env=env)
-    except subprocess.TimeoutExpired:
-        print(RED + "[!] git fetch timed out." + RESET)
-        return False
-    except subprocess.CalledProcessError as e:
-        print(RED + f"[!] git fetch failed: {e}" + RESET)
-        return False
-
-    try:
         local = git_as_user(["rev-parse", "HEAD"], capture_output=True, timeout=10, env=env)
+        remote = git_as_user(["rev-parse", "@{u}"], capture_output=True, timeout=10, env=env)
+        return local != remote
     except Exception:
-        print(RED + "[!] Could not read local HEAD." + RESET)
         return False
-
-    try:
-        remoto = git_as_user(["rev-parse", "@{u}"], capture_output=True, timeout=10, env=env)
-    except subprocess.CalledProcessError:
-        print(RED + "[!] Remote branch not found (no upstream configured?)" + RESET)
-        return False
-    except subprocess.TimeoutExpired:
-        print(RED + "[!] git rev-parse @{u} timed out." + RESET)
-        return False
-
-    return local != remoto
-
 
 def do_update():
     env = os.environ.copy()
     env["GIT_TERMINAL_PROMPT"] = "0"
-    print(YELLOW + "Updating..." + RESET)
     try:
         git_as_user(["pull", "--ff-only"], timeout=60, env=env)
         print(GREEN + "Update completed." + RESET)
-    except subprocess.TimeoutExpired:
-        print(RED + "[!] git pull timed out." + RESET)
-    except subprocess.CalledProcessError as e:
-        print(RED + f"[!] git pull failed. Run 'git pull' manually to see the error: {e}" + RESET)
+    except Exception:
+        print(RED + "[!] Update failed." + RESET)
     time.sleep(2)
 
-
-if update_available():
-    if input(GREEN + "\nAn update is available right now, you want to install it? y/n " + RESET) == "y":
-        do_update()
-    else:
-        print("ok")
-
-
-class FileBrowser:
-    def __init__(self, start_path=None):
-        self.current_path = os.path.expanduser(start_path or "~")
-        self.entries = []
-        self.selected_index = 0
-        self.message = ""
-
-        self.update_entries()
-
-        self.text_control = FormattedTextControl(self.get_formatted_text)
-        self.window = Window(content=self.text_control, always_hide_cursor=True)
-
-        self.kb = KeyBindings()
-        self.kb_add_bindings()
-
-        self.layout = Layout(HSplit([
-            self.window,
-            Window(height=1, char="-"),
-            Window(height=1, content=FormattedTextControl(lambda: [("class:message", self.message)]))
-        ]))
-
-        self.style = Style.from_dict({
-            "selected": "reverse",
-            "directory": "ansiblue",
-            "message": "ansicyan italic",
-        })
-
-        self.app = Application(layout=self.layout, key_bindings=self.kb, style=self.style, full_screen=False)
-
-    def update_entries(self):
-        try:
-            entries = os.listdir(self.current_path)
-        except Exception:
-            entries = []
-        entries = [e for e in entries if not e.startswith(".")]
-        if os.path.dirname(self.current_path) != self.current_path:
-            entries.insert(0, "..")
-        self.entries = sorted(entries, key=lambda x: (not os.path.isdir(os.path.join(self.current_path, x)), x.lower()))
-        if self.selected_index >= len(self.entries):
-            self.selected_index = max(0, len(self.entries) - 1)
-
-    def get_formatted_text(self):
-        result = []
-        header = [("class:directory", f" Current path: {self.current_path}\n\n")]
-        result.extend(header)
-
-        if not self.entries:
-            result.append(("", "No files or directories"))
-            return result
-
-        for i, entry in enumerate(self.entries):
-            full_path = os.path.join(self.current_path, entry)
-            if i == self.selected_index:
-                style = "class:selected"
-            else:
-                style = ""
-
-            if os.path.isdir(full_path):
-                display = entry + "/"
-                style += " class:directory"
-            else:
-                display = entry
-
-            result.append((style, display + "\n"))
-        return result
-
-    def kb_add_bindings(self):
-        @self.kb.add("up")
-        def up(event):
-            if self.selected_index > 0:
-                self.selected_index -= 1
-
-        @self.kb.add("down")
-        def down(event):
-            if self.selected_index < len(self.entries) - 1:
-                self.selected_index += 1
-
-        @self.kb.add("enter")
-        def enter(event):
-            selected = self.entries[self.selected_index]
-            full_path = os.path.join(self.current_path, selected)
-
-            if selected == "..":
-                self.current_path = os.path.dirname(self.current_path)
-                self.update_entries()
-            elif os.path.isdir(full_path):
-                self.current_path = full_path
-                self.update_entries()
-            else:
-                event.app.exit(result=os.path.realpath(full_path))
-
-        @self.kb.add("backspace")
-        def backspace(event):
-            if os.path.dirname(self.current_path) != self.current_path:
-                self.current_path = os.path.dirname(self.current_path)
-                self.update_entries()
-
-        @self.kb.add("escape")
-        @self.kb.add("c-c")
-        def exit_(event):
-            event.app.exit(result=None)
-
-    def run(self):
-        subprocess.run("clear")
-        result = self.app.run()
-        subprocess.run("clear")
-        return result
-
-
-def select_path_interactive(prompt_text="Select file or directory"):
-    print(CYAN + f"{prompt_text} (Use arrows ↑↓, Enter to select/enter, Backspace to go back, ESC to cancel)" + RESET)
-    home_user = os.path.join("/home", os.environ.get("SUDO_USER") or getpass.getuser())
-    browser = FileBrowser(start_path=home_user)
-    path = browser.run()
-    if path is None:
-        print(RED + "Selection cancelled." + RESET)
-        sys.exit(1)
-    return path
-
-
-if os.geteuid() != 0:
-    print(RED + "Please run with sudo." + RESET)
-    sys.exit(1)
-
-subprocess.run("clear")
-
-shortcuts = [file for file in os.listdir("/usr/local/bin/")]
-
-print(BOLD + CYAN + "Welcome to the shortcut manager." + RESET)
-print(CYAN + "Your current shortcuts are:" + RESET)
-print(BLUE + str(shortcuts) + "\n" + RESET)
-
-userChoose = input(
-    GREEN + "If you want to add another -> +" + RESET + "\n" +
-    RED + "If you want to delete one -> -" + RESET + "\n"
-)
-print()
-
-if userChoose == "+":
-    name = " "
-    while " " in name or name == "":
-        print(CYAN + "Choose the shortcut name" + RESET)
-        name = input().strip()
-        if " " in name or name == "":
-            print(RED + "The name cannot contain spaces or be empty.\n" + RESET)
-
-    print()
-
-    path = select_path_interactive("Enter the executable file path")
-
-    pathWithoutFile = os.path.dirname(path)
-    file = os.path.basename(path)
-
-    print(RED + "\nTrying to prioritize process for better performance...\n" + RESET)
-
-    shortcutPrep = f"cd {pathWithoutFile} && nice ./{file} $@"
-
+# ---------------- Funciones de shortcuts ----------------
+def create_shortcut(exec_path, name, icon_path=None):
+    if not os.path.isfile(exec_path) or not os.access(exec_path, os.X_OK):
+        print(RED + f"Error: '{exec_path}' no existe o no es ejecutable" + RESET)
+        return False
+    if not name or " " in name:
+        print(RED + "Error: el nombre del shortcut no puede estar vacío ni contener espacios" + RESET)
+        return False
     os.makedirs("build", exist_ok=True)
+    path_without_file = os.path.dirname(exec_path)
+    file_name = os.path.basename(exec_path)
+    shortcut_prep = f"cd {path_without_file} && nice ./{file_name} $@"
     with open("build/commandBuild", "w") as prep:
-        prep.write(shortcutPrep)
+        prep.write(shortcut_prep)
+    subprocess.run(f"sudo cp build/commandBuild {SHORTCUT_DIR}{name}", shell=True)
+    subprocess.run(f"chmod +x {SHORTCUT_DIR}{name}", shell=True)
 
-    subprocess.run("sudo cp build/commandBuild /usr/local/bin/", shell=True)
-    subprocess.run(f"sudo mv /usr/local/bin/commandBuild /usr/local/bin/{name}", shell=True)
-    subprocess.run(f"chmod +x /usr/local/bin/{name}", shell=True)
-
-    print("\n" + GREEN + "Created!" + RESET)
-
-    add_icon = input("Do you want to add an icon? y/n\n").strip().lower()
-    if add_icon == "y":
+    if icon_path and os.path.isfile("appTemplate.desktop"):
         with open("appTemplate.desktop", "r") as template:
             content = template.read()
-
         content = content.replace("%exec%", name)
+        content = content.replace("%icon%", icon_path)
+        with open("build/appBuild.desktop", "w") as f:
+            f.write(content)
+        subprocess.run(f"sudo cp build/appBuild.desktop {DESKTOP_DIR}{name}.desktop", shell=True)
+    return True
 
-        iconPath = select_path_interactive("Enter the icon file path")
-
-        content = content.replace("%icon%", iconPath)
-
-        with open("build/appBuild.desktop", "w") as appBuild:
-            appBuild.write(content)
-
-        subprocess.run(f"cp build/appBuild.desktop /usr/share/applications/{name}.desktop", shell=True)
-        print(GREEN + "\nCreated icon\n" + RESET)
-
-    print(YELLOW + "You can do more things by running this again." + RESET)
-    time.sleep(2.5)
-
-elif userChoose == "-":
-    print(RED + "Which shortcut do you want to remove?" + RESET)
-    name = input().strip()
-    subprocess.run(f"sudo rm /usr/local/bin/{name}", shell=True)
-
-    desktop_file = f"/usr/share/applications/{name}.desktop"
+def remove_shortcut(name):
+    if os.path.isfile(f"{SHORTCUT_DIR}{name}"):
+        subprocess.run(f"sudo rm {SHORTCUT_DIR}{name}", shell=True)
+    desktop_file = f"{DESKTOP_DIR}{name}.desktop"
     if os.path.isfile(desktop_file):
         subprocess.run(f"sudo rm {desktop_file}", shell=True)
 
-    print("\n" + GREEN + "Completed!" + RESET)
-    time.sleep(1.5)
+# ---------------- Modo GUI moderno ----------------
+if USE_GUI:
+    import gi
+    gi.require_version("Gtk", "3.0")
+    from gi.repository import Gtk, Gdk, GLib, Gio
 
+    class ShortcutManagerGTK(Gtk.Window):
+        def __init__(self):
+            super().__init__(title="Shortcut Manager")
+            self.set_default_size(700, 500)
+            self.set_border_width(10)
+
+            # CSS moderno con hover
+            css = b"""
+            .shortcut-row { padding: 5px; border-bottom: 1px solid #ccc; }
+            .shortcut-row:hover { background-color: #e0e0e0; }
+            .shortcut-name { font-weight: bold; font-size: 14px; }
+            .shortcut-path { font-size: 11px; color: #555; }
+            """
+            style_provider = Gtk.CssProvider()
+            style_provider.load_from_data(css)
+            Gtk.StyleContext.add_provider_for_screen(
+                Gdk.Screen.get_default(), style_provider,
+                Gtk.STYLE_PROVIDER_PRIORITY_USER
+            )
+
+            vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+            self.add(vbox)
+
+            scrolled = Gtk.ScrolledWindow()
+            scrolled.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+            vbox.pack_start(scrolled, True, True, 0)
+
+            self.listbox = Gtk.ListBox()
+            self.listbox.set_selection_mode(Gtk.SelectionMode.SINGLE)
+            scrolled.add(self.listbox)
+
+            hbox = Gtk.Box(spacing=10)
+            vbox.pack_start(hbox, False, False, 0)
+
+            add_btn = Gtk.Button(label="Add Shortcut")
+            add_btn.connect("clicked", self.on_add)
+            hbox.pack_start(add_btn, True, True, 0)
+
+            remove_btn = Gtk.Button(label="Remove Shortcut")
+            remove_btn.connect("clicked", self.on_remove)
+            hbox.pack_start(remove_btn, True, True, 0)
+
+            update_btn = Gtk.Button(label="Check for Updates")
+            update_btn.connect("clicked", self.on_update)
+            hbox.pack_start(update_btn, True, True, 0)
+
+            GLib.idle_add(self.check_update_startup)
+            self.refresh_shortcuts()
+
+        def refresh_shortcuts(self):
+            self.listbox.foreach(lambda w: self.listbox.remove(w))
+            shortcuts = sorted([f for f in os.listdir(SHORTCUT_DIR) if os.path.isfile(os.path.join(SHORTCUT_DIR, f))])
+
+            for s in shortcuts:
+                row = Gtk.ListBoxRow()
+                row.get_style_context().add_class("shortcut-row")
+                hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
+                row.add(hbox)
+
+                # Icono (si existe .desktop con icono)
+                desktop_file = os.path.join(DESKTOP_DIR, f"{s}.desktop")
+                icon_image = None
+                if os.path.isfile(desktop_file):
+                    gfile = Gio.File.new_for_path(desktop_file)
+                    info = gfile.query_info("standard::icon", Gio.FileQueryInfoFlags.NONE, None)
+                    icon = info.get_icon()
+                    if icon:
+                        theme_icon = Gtk.Image.new_from_gicon(icon, Gtk.IconSize.MENU)
+                        icon_image = theme_icon
+
+                if icon_image:
+                    hbox.pack_start(icon_image, False, False, 5)
+
+                vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+                hbox.pack_start(vbox, True, True, 0)
+
+                label_name = Gtk.Label(label=s, xalign=0)
+                label_name.get_style_context().add_class("shortcut-name")
+                vbox.pack_start(label_name, False, False, 0)
+
+                label_path = Gtk.Label(label=os.path.join(SHORTCUT_DIR, s), xalign=0)
+                label_path.get_style_context().add_class("shortcut-path")
+                vbox.pack_start(label_path, False, False, 0)
+
+                self.listbox.add(row)
+            self.listbox.show_all()
+
+        def on_add(self, widget):
+            dialog = Gtk.FileChooserDialog(title="Select Executable", parent=self, action=Gtk.FileChooserAction.OPEN)
+            dialog.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OPEN, Gtk.ResponseType.OK)
+            if dialog.run() == Gtk.ResponseType.OK:
+                exec_path = dialog.get_filename()
+            else:
+                dialog.destroy()
+                return
+            dialog.destroy()
+
+            name_dialog = Gtk.Dialog(title="Shortcut Name", parent=self)
+            box = name_dialog.get_content_area()
+            entry = Gtk.Entry()
+            entry.set_placeholder_text("Shortcut name")
+            box.add(entry)
+            name_dialog.add_button("Cancel", Gtk.ResponseType.CANCEL)
+            name_dialog.add_button("OK", Gtk.ResponseType.OK)
+            name_dialog.show_all()
+            if name_dialog.run() == Gtk.ResponseType.OK:
+                name = entry.get_text().strip()
+            else:
+                name_dialog.destroy()
+                return
+            name_dialog.destroy()
+
+            if not name or " " in name:
+                error = Gtk.MessageDialog(parent=self, flags=0,
+                                          message_type=Gtk.MessageType.ERROR,
+                                          buttons=Gtk.ButtonsType.CLOSE,
+                                          text="Invalid shortcut name")
+                error.run()
+                error.destroy()
+                return
+
+            icon_path = None
+            icon_dialog = Gtk.MessageDialog(parent=self, flags=0,
+                                            message_type=Gtk.MessageType.QUESTION,
+                                            buttons=Gtk.ButtonsType.YES_NO,
+                                            text="Do you want to add an icon?")
+            if icon_dialog.run() == Gtk.ResponseType.YES:
+                dialog = Gtk.FileChooserDialog(title="Select Icon", parent=self, action=Gtk.FileChooserAction.OPEN)
+                dialog.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OPEN, Gtk.ResponseType.OK)
+                if dialog.run() == Gtk.ResponseType.OK:
+                    icon_path = dialog.get_filename()
+                dialog.destroy()
+            icon_dialog.destroy()
+            create_shortcut(exec_path, name, icon_path)
+            self.refresh_shortcuts()
+
+        def on_remove(self, widget):
+            selection = self.listbox.get_selected_row()
+            if not selection:
+                return
+            vbox = selection.get_child().get_children()[1]  # el VBox de labels
+            name = vbox.get_children()[0].get_text()
+            confirm = Gtk.MessageDialog(parent=self, flags=0,
+                                        message_type=Gtk.MessageType.QUESTION,
+                                        buttons=Gtk.ButtonsType.YES_NO,
+                                        text=f"Do you want to remove '{name}'?")
+            if confirm.run() == Gtk.ResponseType.YES:
+                remove_shortcut(name)
+            confirm.destroy()
+            self.refresh_shortcuts()
+
+        def on_update(self, widget=None):
+            if update_available():
+                dialog = Gtk.MessageDialog(parent=self, flags=0,
+                                           message_type=Gtk.MessageType.QUESTION,
+                                           buttons=Gtk.ButtonsType.YES_NO,
+                                           text="An update is available. Install it?")
+                if dialog.run() == Gtk.ResponseType.YES:
+                    do_update()
+                dialog.destroy()
+                self.refresh_shortcuts()
+            else:
+                info = Gtk.MessageDialog(parent=self, flags=0,
+                                         message_type=Gtk.MessageType.INFO,
+                                         buttons=Gtk.ButtonsType.OK,
+                                         text="No updates available.")
+                info.run()
+                info.destroy()
+
+        def check_update_startup(self):
+            self.on_update()
+            return False
+
+    win = ShortcutManagerGTK()
+    win.connect("destroy", Gtk.main_quit)
+    win.show_all()
+    Gtk.main()
+
+# ---------------- Modo Terminal ----------------
 else:
-    print(BLUE + "Exit." + RESET)
-    time.sleep(1.5)
+    if update_available():
+        if input(GREEN + "\nAn update is available. Install it? y/n " + RESET) == "y":
+            do_update()
+    subprocess.run("clear")
+    shortcuts = [file for file in os.listdir(SHORTCUT_DIR)]
+    print(BOLD + CYAN + "Shortcut Manager (Terminal Mode)" + RESET)
+    print(CYAN + "Shortcuts:" + RESET)
+    print(BLUE + str(shortcuts) + "\n" + RESET)
+
+    userChoose = input(GREEN + "Add -> +\n" + RED + "Remove -> -\n" + RESET)
+    if userChoose == "+":
+        name = ""
+        while " " in name or name == "":
+            name = input(CYAN + "Shortcut name: " + RESET).strip()
+        exec_path = input(CYAN + "Executable path: " + RESET).strip()
+        icon_path = None
+        if input("Add icon? y/n: ").strip().lower() == "y":
+            icon_path = input(CYAN + "Icon path: " + RESET).strip()
+        create_shortcut(exec_path, name, icon_path)
+        print(GREEN + "Created!" + RESET)
+    elif userChoose == "-":
+        name = input(RED + "Shortcut to remove: " + RESET).strip()
+        remove_shortcut(name)
+        print(GREEN + "Removed!" + RESET)
+    else:
+        print(BLUE + "Exit." + RESET)
+        time.sleep(1.5)
