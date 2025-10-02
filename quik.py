@@ -126,6 +126,8 @@ if USE_GUI:
         gi.require_version("Gtk", "3.0")
         from gi.repository import Gtk, Gdk, GLib, Gio
     except ImportError:
+        print("NO FUNCIONA")
+        exit()
         print("[!] GTK 3 not found. Attempting to install dependencies...")
         install_gtk_dependencies()
         # Intentamos importar de nuevo
