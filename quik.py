@@ -103,22 +103,6 @@ def remove_shortcut(name):
 
 # ---------------- Modo GUI moderno ----------------
 if USE_GUI:
-    def install_gtk_dependencies():
-        packages = [
-            "libgirepository1.0-dev",
-            "python3-gi",
-            "python3-gi-cairo",
-            "gir1.2-gtk-3.0"
-        ]
-        try:
-            print("[+] Installing GTK 3.0 dependencies...")
-            subprocess.run(["sudo", "apt", "update"], check=True)
-            subprocess.run(["sudo", "apt", "install", "-y"] + packages, check=True)
-            print("[+] GTK 3.0 dependencies installed successfully.")
-        except subprocess.CalledProcessError:
-            print("[!] Failed to install some GTK 3.0 packages automatically.")
-            print("[!] Please run manually:")
-            print("sudo apt install " + " ".join(packages))
             
     # ---------------- Ahora sí podemos importar GTK ----------------
     try:
@@ -126,11 +110,9 @@ if USE_GUI:
         gi.require_version("Gtk", "3.0")
         from gi.repository import Gtk, Gdk, GLib, Gio
     except ImportError:
-        print("NO FUNCIONA")
-        exit()
-        print("[!] GTK 3 not found. Attempting to install dependencies...")
-        install_gtk_dependencies()
-        # Intentamos importar de nuevo
+        subprocess.run("sudo apt update", shell=True)
+        subprocess.run("sudo apt install python3-gi python3-gi-cairo gir1.2-gtk-3.0", shell=True)
+        
         import gi
         gi.require_version("Gtk", "3.0")
         from gi.repository import Gtk, Gdk, GLib, Gio
