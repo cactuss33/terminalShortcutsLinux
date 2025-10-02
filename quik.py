@@ -7,6 +7,11 @@ import getpass
 import socket
 import threading
 
+
+subprocess.run("sudo apt install python3-gi python3-gi-cairo gir1.2-gtk-3.0",shell=True)
+
+
+
 # ---------------- Modo de ejecución ----------------
 USE_GUI = "-noGui" not in sys.argv
 
@@ -108,7 +113,7 @@ if USE_GUI:
     try:
         import gi
         gi.require_version("Gtk", "3.0")
-        from gi.repository import Gtk, Gdk, GLib, Gio
+        from gi.repository import Gtk, Gdk, GLib, Gio, abcd
     except ImportError:
         subprocess.run("sudo apt update", shell=True)
         subprocess.run("sudo apt install python3-gi python3-gi-cairo gir1.2-gtk-3.0", shell=True)
