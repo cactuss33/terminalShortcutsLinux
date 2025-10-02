@@ -1,1 +1,7 @@
-este archivo no es importante, cuando se ejecute el programa lo sobreescribira
+[Desktop Entry]
+Name=quik
+Comment=MadewithterminalShortcutsLinux
+Exec=quik
+Icon=/home/martiparra/icon.png
+Terminal=false
+Type=Application

@@ -1,9 +1,11 @@
+import signal
 import os
 import sys
 import subprocess
 import time
 import getpass
 import socket
+import threading
 
 # ---------------- Modo de ejecución ----------------
 USE_GUI = "-noGui" not in sys.argv
@@ -96,15 +98,45 @@ def remove_shortcut(name):
     if os.path.isfile(desktop_file):
         subprocess.run(f"sudo rm {desktop_file}", shell=True)
 
+
+
+
 # ---------------- Modo GUI moderno ----------------
 if USE_GUI:
-    import gi
-    gi.require_version("Gtk", "3.0")
-    from gi.repository import Gtk, Gdk, GLib, Gio
-
+    def install_gtk_dependencies():
+        packages = [
+            "libgirepository1.0-dev",
+            "python3-gi",
+            "python3-gi-cairo",
+            "gir1.2-gtk-3.0"
+        ]
+        try:
+            print("[+] Installing GTK 3.0 dependencies...")
+            subprocess.run(["sudo", "apt", "update"], check=True)
+            subprocess.run(["sudo", "apt", "install", "-y"] + packages, check=True)
+            print("[+] GTK 3.0 dependencies installed successfully.")
+        except subprocess.CalledProcessError:
+            print("[!] Failed to install some GTK 3.0 packages automatically.")
+            print("[!] Please run manually:")
+            print("sudo apt install " + " ".join(packages))
+            
+    # ---------------- Ahora sí podemos importar GTK ----------------
+    try:
+        import gi
+        gi.require_version("Gtk", "3.0")
+        from gi.repository import Gtk, Gdk, GLib, Gio
+    except ImportError:
+        print("[!] GTK 3 not found. Attempting to install dependencies...")
+        install_gtk_dependencies()
+        # Intentamos importar de nuevo
+        import gi
+        gi.require_version("Gtk", "3.0")
+        from gi.repository import Gtk, Gdk, GLib, Gio
+    
     class ShortcutManagerGTK(Gtk.Window):
         def __init__(self):
             super().__init__(title="Shortcut Manager")
+            self.running_shortcuts = {}  # Llevará el estado de cada shortcut
             self.set_default_size(700, 500)
             self.set_border_width(10)
 
@@ -154,38 +186,98 @@ if USE_GUI:
         def refresh_shortcuts(self):
             self.listbox.foreach(lambda w: self.listbox.remove(w))
             shortcuts = sorted([f for f in os.listdir(SHORTCUT_DIR) if os.path.isfile(os.path.join(SHORTCUT_DIR, f))])
-
+        
             for s in shortcuts:
                 row = Gtk.ListBoxRow()
                 row.get_style_context().add_class("shortcut-row")
                 hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
                 row.add(hbox)
-
-                # Icono (si existe .desktop con icono)
+        
+                # Icono de estado (verde por defecto)
+                state_icon = Gtk.Image.new_from_icon_name("media-playback-start", Gtk.IconSize.MENU)
+                hbox.pack_start(state_icon, False, False, 5)
+                
                 desktop_file = os.path.join(DESKTOP_DIR, f"{s}.desktop")
-                icon_image = None
+                icon_path = None
                 if os.path.isfile(desktop_file):
+                    # Intentar leer el icono desde el .desktop
                     gfile = Gio.File.new_for_path(desktop_file)
                     info = gfile.query_info("standard::icon", Gio.FileQueryInfoFlags.NONE, None)
                     icon = info.get_icon()
                     if icon:
-                        theme_icon = Gtk.Image.new_from_gicon(icon, Gtk.IconSize.MENU)
-                        icon_image = theme_icon
-
-                if icon_image:
-                    hbox.pack_start(icon_image, False, False, 5)
-
+                        try:
+                            # Intenta usar gicon
+                            theme_icon = Gtk.Image.new_from_gicon(icon, Gtk.IconSize.MENU)
+                            theme_icon.set_pixel_size(32)  # Ajustar tamaño
+                            hbox.pack_start(theme_icon, False, False, 5)
+                        except Exception:
+                            # Fallback: icono genérico si falla
+                            fallback = Gtk.Image.new_from_icon_name("application-x-executable", Gtk.IconSize.MENU)
+                            hbox.pack_start(fallback, False, False, 5)
+                    else:
+                        # Fallback si no hay icono
+                        fallback = Gtk.Image.new_from_icon_name("application-x-executable", Gtk.IconSize.MENU)
+                        hbox.pack_start(fallback, False, False, 5)
+                else:
+                    # Fallback si no existe .desktop
+                    fallback = Gtk.Image.new_from_icon_name("application-x-executable", Gtk.IconSize.MENU)
+                    hbox.pack_start(fallback, False, False, 5)
+                
                 vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
                 hbox.pack_start(vbox, True, True, 0)
-
+        
                 label_name = Gtk.Label(label=s, xalign=0)
                 label_name.get_style_context().add_class("shortcut-name")
                 vbox.pack_start(label_name, False, False, 0)
-
+        
                 label_path = Gtk.Label(label=os.path.join(SHORTCUT_DIR, s), xalign=0)
                 label_path.get_style_context().add_class("shortcut-path")
                 vbox.pack_start(label_path, False, False, 0)
+        
+                # Botón ejecutar
+                run_btn = Gtk.Button()
+                play_icon = Gtk.Image.new_from_icon_name("media-playback-start", Gtk.IconSize.BUTTON)
+                run_btn.set_image(play_icon)
+                run_btn.set_always_show_image(True)
 
+                hbox.pack_start(run_btn, False, False, 5)
+        
+                def run_shortcut(button, shortcut_name, shortcut_path, running_shortcuts):
+                    if running_shortcuts.get(shortcut_name):
+                        # Terminar el proceso
+                        proc = running_shortcuts[shortcut_name]
+                        if proc.poll() is None:  # sigue corriendo
+                            os.killpg(os.getpgid(proc.pid), signal.SIGTERM)  # termina toda la group
+                            print(f"Stopped {shortcut_name}")
+                        return
+                
+                    # Cambiar icono del botón
+                    icon_widget = button.get_image()
+                    icon_widget.set_from_icon_name("process-stop", Gtk.IconSize.BUTTON)
+                
+                    # Lanzar proceso en su propio grupo de procesos
+                    proc = subprocess.Popen(
+                        shortcut_path,
+                        shell=True,             # importante para scripts
+                        preexec_fn=os.setsid
+                    )
+                    
+                
+                    running_shortcuts[shortcut_name] = proc
+                
+                    # Hilo que espera a que termine
+                    def monitor():
+                        proc.wait()
+                        GLib.idle_add(icon_widget.set_from_icon_name, "media-playback-start", Gtk.IconSize.BUTTON)
+                        running_shortcuts.pop(shortcut_name, None)
+                
+                    threading.Thread(target=monitor, daemon=True).start()
+        
+                run_btn.connect(
+                    "clicked",
+                    lambda btn, s=s: run_shortcut(btn, shortcut_name=s, shortcut_path=os.path.join(SHORTCUT_DIR, s), running_shortcuts=self.running_shortcuts)
+                )
+            
                 self.listbox.add(row)
             self.listbox.show_all()
 
