@@ -8,8 +8,8 @@ import socket
 import threading
 
 
-subprocess.run("sudo apt install python3-gi python3-gi-cairo gir1.2-gtk-3.0",shell=True)
-
+subprocess.run("sudo apt update && sudo apt install python3-gi python3-gi-cairo gir1.2-gtk-3.0",shell=True)
+    
 
 
 # ---------------- Modo de ejecución ----------------
@@ -113,14 +113,12 @@ if USE_GUI:
     try:
         import gi
         gi.require_version("Gtk", "3.0")
-        from gi.repository import Gtk, Gdk, GLib, Gio, abcd
-    except ImportError:
-        subprocess.run("sudo apt update", shell=True)
-        subprocess.run("sudo apt install python3-gi python3-gi-cairo gir1.2-gtk-3.0", shell=True)
-        
-        import gi
-        gi.require_version("Gtk", "3.0")
         from gi.repository import Gtk, Gdk, GLib, Gio
+    except (ImportError, ValueError) as e:
+        print("[!] Error cargando GTK:", e)
+        print("→ Intenta instalar las dependencias con:")
+        print("   sudo apt update && sudo apt install python3-gi python3-gi-cairo gir1.2-gtk-3.0")
+        sys.exit(1)
     
     class ShortcutManagerGTK(Gtk.Window):
         def __init__(self):
