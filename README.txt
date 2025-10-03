@@ -2,7 +2,7 @@ Hola, esto es una prueba.
 Este script instala prompt-toolkit para permitir el autocompletado de ficheros.
 El sistema de autocompletado ha sido desarrollado por ChatGPT; el resto del código es mío.
 
-Para descargar:
+Para descargar ->>
 
 git clone https://github.com/cactuss33/terminalShortcutsLinux/ && cd terminalShortcutsLinux && ./start.sh
 
