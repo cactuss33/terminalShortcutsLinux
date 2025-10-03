@@ -42,15 +42,19 @@ DESKTOP_DIR = "/usr/share/applications/"
 
 # ---------------- Funciones compartidas ----------------
 def git_as_user(cmd, timeout=None, capture_output=False, env=None):
-    user = os.environ.get("SUDO_USER", os.environ.get("USER"))
-    base = ["sudo", "-u", user, "git"] + cmd
+    user = os.environ.get("SUDO_USER")
+    if user:
+        base = ["sudo", "-u", user, "git"] + cmd
+    else:
+        base = ["git"] + cmd
+
     if capture_output:
         out = subprocess.check_output(base, stderr=subprocess.STDOUT, timeout=timeout, env=env)
         return out.decode().strip()
     else:
-        subprocess.run(base, check=True, timeout=timeout,
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=env)
+        subprocess.run(base, check=True, timeout=timeout, env=env)
         return None
+
 
 def has_internet(host="github.com", port=443, timeout=3):
     try:
@@ -77,10 +81,13 @@ def do_update():
     env = os.environ.copy()
     env["GIT_TERMINAL_PROMPT"] = "0"
     try:
-        git_as_user(["pull", "--ff-only"], timeout=60, env=env)
-        print(GREEN + "Update completed." + RESET)
-    except Exception:
-        print(RED + "[!] Update failed." + RESET)
+        # Traer lo último del remoto
+        git_as_user(["fetch", "--all"], timeout=60, env=env)
+        # Forzar a que tu repo local quede idéntico al remoto
+        git_as_user(["reset", "--hard", "origin/main"], timeout=60, env=env)
+        print(GREEN + "Update completed (forced)." + RESET)
+    except Exception as e:
+        print(RED + f"[!] Update failed: {e}" + RESET)
     time.sleep(2)
 
 # ---------------- Funciones de shortcuts ----------------
