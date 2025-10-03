@@ -8,8 +8,22 @@ import socket
 import threading
 
 
-subprocess.run("sudo apt update && sudo apt install python3-gi python3-gi-cairo gir1.2-gtk-3.0",shell=True)
-    
+if "-noGui" not in sys.argv:  # Solo si se usa GUI
+    try:
+        import gi
+        gi.require_version("Gtk", "3.0")
+        from gi.repository import Gtk, Gdk, GLib, Gio
+    except (ImportError, ValueError):
+        print("[!] GTK no encontrado, instalando dependencias...")
+        subprocess.run(
+            "sudo apt update && sudo apt install -y python3-gi python3-gi-cairo gir1.2-gtk-3.0",
+            shell=True,
+            check=True
+        )
+        # Reintentar la importación
+        import gi
+        gi.require_version("Gtk", "3.0")
+        from gi.repository import Gtk, Gdk, GLib, Gio    
 
 
 # ---------------- Modo de ejecución ----------------
@@ -97,6 +111,7 @@ def create_shortcut(exec_path, name, icon_path=None):
     return True
 
 def remove_shortcut(name):
+    print("sip")
     if os.path.isfile(f"{SHORTCUT_DIR}{name}"):
         subprocess.run(f"sudo rm {SHORTCUT_DIR}{name}", shell=True)
     desktop_file = f"{DESKTOP_DIR}{name}.desktop"
@@ -321,8 +336,22 @@ if USE_GUI:
             selection = self.listbox.get_selected_row()
             if not selection:
                 return
-            vbox = selection.get_child().get_children()[1]  # el VBox de labels
-            name = vbox.get_children()[0].get_text()
+        
+            # Buscar el VBox dentro del hbox
+            hbox = selection.get_child()
+            vbox = None
+            for child in hbox.get_children():
+                if isinstance(child, Gtk.Box) and child.get_orientation() == Gtk.Orientation.VERTICAL:
+                    vbox = child
+                    break
+        
+            if not vbox:
+                print("[!] No se pudo encontrar el VBox de labels")
+                return
+        
+            name_label = vbox.get_children()[0]  # label_name
+            name = name_label.get_text()
+        
             confirm = Gtk.MessageDialog(parent=self, flags=0,
                                         message_type=Gtk.MessageType.QUESTION,
                                         buttons=Gtk.ButtonsType.YES_NO,
@@ -331,6 +360,7 @@ if USE_GUI:
                 remove_shortcut(name)
             confirm.destroy()
             self.refresh_shortcuts()
+        
 
         def on_update(self, widget=None):
             if update_available():

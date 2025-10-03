@@ -1,1 +1,1 @@
-cd /home/martiparra/Downloads/loaded/Celeste && nice ./Celeste $@
+cd /home/cactuss33/terminalShortcutsLinux && nice ./start.sh $@
