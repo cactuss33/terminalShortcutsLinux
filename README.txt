@@ -1,6 +1,5 @@
 Hola, esto es una prueba.
-Este script instala prompt-toolkit para permitir el autocompletado de ficheros.
-El sistema de autocompletado ha sido desarrollado por ChatGPT; el resto del código es mío.
+Este script instala varias librerias para la interfaz
 
 Para descargar:
 
