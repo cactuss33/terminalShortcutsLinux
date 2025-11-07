@@ -101,7 +101,7 @@ def create_shortcut(exec_path, name, icon_path=None):
     os.makedirs("build", exist_ok=True)
     path_without_file = os.path.dirname(exec_path)
     file_name = os.path.basename(exec_path)
-    shortcut_prep = f"cd {path_without_file} && nice ./{file_name} $@"
+    shortcut_prep = f"cd '{path_without_file}' && nice ./{file_name} $@"
     with open("build/commandBuild", "w") as prep:
         prep.write(shortcut_prep)
     subprocess.run(f"sudo cp build/commandBuild {SHORTCUT_DIR}{name}", shell=True)
