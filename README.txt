@@ -1,7 +1,7 @@
 Hola, esto es una prueba.
 Este script instala varias librerias para la interfaz
 
-Para descargar:
+Para descargar ->
 
 git clone https://github.com/cactuss33/terminalShortcutsLinux/ && cd terminalShortcutsLinux && ./start.sh
 
